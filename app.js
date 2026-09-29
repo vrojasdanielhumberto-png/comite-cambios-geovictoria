@@ -4,6 +4,8 @@
 // nadie escribe desde aquí). La sesión vive solo en esta pestaña y se cierra tras 30 min sin uso.
 (function () {
   'use strict';
+  // No permitir que otra página muestre esta web dentro de un marco (protección contra suplantación de clics).
+  if (window.top !== window.self) { document.body.textContent = 'Abre el Comité de Cambios directamente desde su dirección.'; return; }
   var URL_SB = 'https://uvodcmmehtghkbwadzlq.supabase.co';
   var LLAVE_PUBLICA = 'sb_publishable_CLYuajCg_s7EcEQDBkKyNQ__j2Wg_t3';
   var INACTIVIDAD_MS = 30 * 60 * 1000;
