@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://uvodcmmehtghkbwadzlq.supabase.co wss://uvodcmmehtghkbwadzlq.supabase.co; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'">
+<title>Comité de Cambios GeoVictoria</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<header class="barra">
+  <div class="marca"><span class="logo" aria-hidden="true"></span><span>Comité de Cambios <b>GeoVictoria Colombia</b></span></div>
+  <div class="sesion" id="sesion" hidden>
+    <span id="quien"></span>
+    <button type="button" class="btn-sec" id="btnSalir">Salir</button>
+  </div>
+</header>
+
+<main>
+  <!-- Ingreso -->
+  <section class="vista" id="vistaLogin" hidden>
+    <form class="tarjeta login" id="formLogin" autocomplete="on" novalidate>
+      <h1>Ingresar</h1>
+      <p class="sub">Cambios que llegan de Chile y su cronograma en Colombia.</p>
+      <label for="correo">Correo corporativo</label>
+      <input id="correo" type="email" autocomplete="username" required>
+      <label for="clave">Contraseña</label>
+      <div class="fila-clave"><input id="clave" type="password" autocomplete="current-password" required><button type="button" class="ojo" id="verClave" aria-label="Mostrar contraseña">Ver</button></div>
+      <button type="submit" class="btn" id="btnEntrar">Entrar</button>
+      <p class="aviso" id="avisoLogin" role="alert"></p>
+      <p class="nota">¿Olvidaste tu contraseña? Pídele a tu líder que la restablezca.</p>
+    </form>
+  </section>
+
+  <!-- Cambio de clave obligatorio -->
+  <section class="vista" id="vistaCambio" hidden>
+    <form class="tarjeta login" id="formCambio" novalidate>
+      <h1>Elige tu contraseña</h1>
+      <p class="sub">Es tu primer ingreso. Reemplaza la contraseña temporal por una propia: mínimo 10 caracteres, con letras y números.</p>
+      <label for="claveActual">Contraseña temporal</label>
+      <input id="claveActual" type="password" autocomplete="current-password" required>
+      <label for="claveNueva">Contraseña nueva</label>
+      <input id="claveNueva" type="password" autocomplete="new-password" required>
+      <label for="claveNueva2">Repite la contraseña nueva</label>
+      <input id="claveNueva2" type="password" autocomplete="new-password" required>
+      <button type="submit" class="btn" id="btnCambiar">Guardar y entrar</button>
+      <p class="aviso" id="avisoCambio" role="alert"></p>
+    </form>
+  </section>
+
+  <!-- Lista de RFC -->
+  <section class="vista" id="vistaLista" hidden>
+    <div class="encabezado">
+      <div>
+        <p class="ceja">Solicitudes de cambio (RFC)</p>
+        <h1>Qué va a cambiar y cuándo</h1>
+      </div>
+      <input type="search" id="buscar" placeholder="Buscar por título" aria-label="Buscar RFC">
+    </div>
+    <div class="filtros" id="filtros" role="group" aria-label="Filtrar por área"></div>
+    <div id="lista" class="lista" aria-live="polite"></div>
+  </section>
+
+  <!-- Detalle -->
+  <section class="vista" id="vistaDetalle" hidden>
+    <button type="button" class="volver" id="btnVolver">← Todas las RFC</button>
+    <article class="tarjeta detalle" id="detalle"></article>
+  </section>
+</main>
+
+<footer class="pie">Solo lectura. Las RFC las publican la Country y los líderes desde el Comité de Cambios.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
+<script src="app.js"></script>
+</body>
+</html>
