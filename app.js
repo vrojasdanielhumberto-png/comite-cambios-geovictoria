@@ -61,6 +61,7 @@
   function salir(mensaje) {
     estado = nuevoEstado();
     clearTimeout(temporizador);
+    detenerTiempoReal();
     sb.auth.signOut().finally(function () {
       $('sesion').hidden = true;
       $('dispCaja').hidden = true;
@@ -83,6 +84,7 @@
     $('sesion').hidden = false;
     reiniciarInactividad();
     if (f.data.debe_cambiar_clave) { $('formCambio').reset(); $('avisoCambio').textContent = ''; mostrar('vistaCambio'); return; }
+    iniciarTiempoReal();
     if (rol === 'cliente') { $('pie').textContent = 'Te responde el asistente de GeoVictoria y, si hace falta, la persona que lleva tu cuenta.'; await abrirCliente(); return; }
     $('pie').textContent = 'Las RFC las publican la Country y los líderes desde el Comité de Cambios.';
     $('dispCaja').hidden = false;
@@ -246,7 +248,7 @@
     }));
   }
   async function cargarCuentas() {
-    var q = sb.from('crm_cuentas').select('id, nombre, etapa, fase_detalle, segmento, usuarios, responsable_correo').eq('activa', true).order('nombre').limit(200);
+    var q = sb.from('crm_cuentas').select('id, nombre, etapa, fase_detalle, segmento, usuarios').eq('activa', true).order('nombre').limit(200);
     var t = $('buscarCuenta').value.trim();
     if (t) q = q.ilike('nombre', '%' + t.replace(/[%_]/g, '') + '%');
     var r = await q;
@@ -270,10 +272,11 @@
   async function pintarConversacion() {
     var id = estado.convAbierta;
     if (!id) return;
-    var c = (await sb.from('conversaciones').select('id, estado, tema, regla, empleado_id, cliente_nombre, crm_cuentas(nombre, etapa, fase_detalle, segmento, usuarios, responsables, senales)').eq('id', id).maybeSingle()).data;
+    var c = (await sb.from('conversaciones').select('id, estado, tema, regla, empleado_id, cliente_nombre, cuenta_id').eq('id', id).maybeSingle()).data;
     var m = (await sb.from('mensajes').select('id, de, autor, texto, en').eq('conversacion_id', id).order('id')).data || [];
     if (!c) return;
-    var cuenta = c.crm_cuentas || {};
+    // Datos internos de la cuenta (sanidad, ERP, responsables): solo por ficha_cuenta(), que verifica que el empleado pueda verla.
+    var cuenta = (await sb.rpc('ficha_cuenta', { p_cuenta: c.cuenta_id })).data || {};
     var s = cuenta.senales || {};
     $('convCabecera').replaceChildren(
       el('h1', { clase: 'titulo-conv', texto: (cuenta.nombre || 'Empresa') + ' — ' + (c.cliente_nombre || '') }),
@@ -354,15 +357,30 @@
   });
   $('txtCliente').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('formCliente').requestSubmit(); } });
 
-  // ---------- refresco automático mientras la pestaña está visible ----------
-  setInterval(function () {
-    if (!estado.ficha || estado.ficha.debe_cambiar_clave || document.visibilityState !== 'visible') return;
+  // ---------- tiempo real ----------
+  // Supabase Realtime avisa al instante de mensajes y conversaciones nuevas. Solo llegan los cambios que las reglas por fila
+  // permiten ver a esta persona (un cliente solo los suyos; un empleado los de sus cuentas). Si la conexión se cae,
+  // queda el refresco de respaldo cada 30 s.
+  var canal = null, pendienteRefresco = null;
+  function refrescar() {
+    if (!estado.ficha || estado.ficha.debe_cambiar_clave) return;
     if (estado.rol === 'cliente' && !$('vistaCliente').hidden) pintarChatCliente();
     if (estado.rol === 'empleado') {
       if (!$('vistaConv').hidden) pintarConversacion();
       cargarConversaciones();
     }
-  }, 5000);
+  }
+  function alCambiar() { clearTimeout(pendienteRefresco); pendienteRefresco = setTimeout(refrescar, 150); }
+  function iniciarTiempoReal() {
+    detenerTiempoReal();
+    canal = sb.channel('portal-' + (estado.uid || 'x'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mensajes' }, alCambiar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversaciones' }, alCambiar)
+      .subscribe();
+  }
+  function detenerTiempoReal() { if (canal) { sb.removeChannel(canal); canal = null; } }
+  setInterval(function () { if (document.visibilityState === 'visible') refrescar(); }, 30000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refrescar(); });
   setInterval(function () { if (estado.rol === 'empleado' && document.visibilityState === 'visible' && !$('vistaLista').hidden) cargarRfcs(); }, 60000);
 
   sb.auth.onAuthStateChange(function (ev) { if (ev === 'SIGNED_OUT' && estado.ficha) salir(''); });

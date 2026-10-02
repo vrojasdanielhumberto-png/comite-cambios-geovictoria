@@ -1,12 +1,19 @@
-# Sincroniza la copia del CRM en Supabase cada 30 minutos (solo LEE el CRM: Zoho hoy, Salesforce después).
+# Actualiza la copia del CRM en Supabase DOS VECES AL DÍA: 6:00 a. m. y 6:00 p. m. de Colombia (11:00 y 23:00 UTC).
+# Lee SOLO lo modificado desde la última revisión (cuida el cupo diario de la API de Zoho) y, los domingos a las 6:00 a. m.,
+# hace una lectura completa para marcar inactivas las empresas que ya no estén. Solo LEE el CRM (Zoho hoy, Salesforce después).
+# No usa la API de Claude: es código normal, no gasta tokens.
 # Queda APAGADA hasta que exista la conexión: se enciende creando la variable del repositorio
 #   CRM_FUENTE = zoho        (o salesforce cuando migren)
 # y el secreto GV_ADMIN_TOKEN (token de administración). Las credenciales del CRM viven en Supabase, no aquí.
 name: Sincronizar CRM
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 11,23 * * *'
   workflow_dispatch:
+    inputs:
+      modo:
+        description: 'incremental (solo lo modificado) o completo'
+        default: 'incremental'
 permissions: {}
 jobs:
   sincronizar:
@@ -17,10 +24,13 @@ jobs:
         env:
           TOKEN: ${{ secrets.GV_ADMIN_TOKEN }}
           FUENTE: ${{ vars.CRM_FUENTE }}
+          MODO_MANUAL: ${{ github.event.inputs.modo }}
         run: |
+          MODO="${MODO_MANUAL:-incremental}"
+          if [ -z "$MODO_MANUAL" ] && [ "$(date -u +%u)" = "7" ] && [ "$(date -u +%H)" = "11" ]; then MODO=completo; fi
           codigo=$(curl -s -o respuesta.json -w "%{http_code}" -X POST \
             -H "content-type: application/json" -H "x-gv-admin: $TOKEN" \
-            -d "{\"fuente\":\"$FUENTE\"}" \
+            -d "{\"fuente\":\"$FUENTE\",\"modo\":\"$MODO\"}" \
             "https://uvodcmmehtghkbwadzlq.supabase.co/functions/v1/crm-sync")
-          echo "HTTP $codigo"; cat respuesta.json; echo
+          echo "HTTP $codigo (modo $MODO)"; cat respuesta.json; echo
           test "$codigo" = "200"
