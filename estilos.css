@@ -113,6 +113,9 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
 .acciones{display:flex;justify-content:flex-end;gap:8px;align-items:center;flex-wrap:wrap}
 .acciones .btn{margin-top:8px;padding:9px 18px}
 .acciones .btn-sec{margin-top:8px}
+.etapa-acciones{justify-content:flex-start;margin-top:6px}
+.etapa-acciones select{background:var(--panel-2);border:1px solid var(--line-2);color:var(--ink);border-radius:8px;padding:5px 8px;margin-top:8px}
+.item.fijo{flex-wrap:wrap}
 .sugerencias{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 
 /* etapas del cliente */

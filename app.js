@@ -10,7 +10,8 @@
   var LLAVE_PUBLICA = 'sb_publishable_CLYuajCg_s7EcEQDBkKyNQ__j2Wg_t3';
   var INACTIVIDAD_MS = 30 * 60 * 1000;
   var ETAPAS = ['SDR', 'Comercial', 'Implementación', 'Postventa'];
-  var SUGERENCIAS = ['¿Qué es GeoVictoria?', '¿En qué etapa va mi proceso?', 'Necesito una factura del último pago', 'El lector biométrico no está marcando bien', '¿Podemos agregar 30 usuarios más?'];
+  var SUGERENCIAS = ['¿Qué es GeoVictoria?', '¿Cómo es el proceso con GeoVictoria?', 'Necesito una factura del último pago', 'El lector biométrico no está marcando bien', '¿Podemos agregar 30 usuarios más?'];
+  var NOMBRE_ETAPA = { 'SDR': 'SDR', 'Comercial': 'Comercial', 'Implementación': 'Implementación', 'Postventa': 'Postventa y facturación' };
 
   var sb = window.supabase.createClient(URL_SB, LLAVE_PUBLICA, {
     auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
@@ -248,7 +249,7 @@
     }));
   }
   async function cargarCuentas() {
-    var q = sb.from('crm_cuentas').select('id, nombre, etapa, fase_detalle, segmento, usuarios').eq('activa', true).order('nombre').limit(200);
+    var q = sb.from('crm_cuentas').select('id, nombre, etapa, segmento, usuarios, etapa_actualizada_por').eq('activa', true).order('nombre').limit(200);
     var t = $('buscarCuenta').value.trim();
     if (t) q = q.ilike('nombre', '%' + t.replace(/[%_]/g, '') + '%');
     var r = await q;
@@ -256,11 +257,41 @@
     if (r.error || !r.data || !r.data.length) { cont.replaceChildren(el('div', { clase: 'vacio', texto: t ? 'Ninguna empresa coincide.' : 'Todavía no tienes cuentas asignadas en el CRM (se cruzan por tu correo).' })); return; }
     cont.replaceChildren.apply(cont, r.data.map(function (c) {
       return el('div', { clase: 'item fijo' }, [el('div', {}, [el('h2', { texto: c.nombre }),
-        el('div', { clase: 'meta', texto: c.etapa + (c.fase_detalle ? ' · ' + c.fase_detalle : '') + (c.segmento ? ' · ' + c.segmento : '') + (c.usuarios != null ? ' · ' + c.usuarios + ' usuarios' : '') })])]);
+        el('div', { clase: 'meta', texto: 'Etapa: ' + (NOMBRE_ETAPA[c.etapa] || c.etapa) + (c.segmento ? ' · ' + c.segmento : '') + (c.usuarios != null ? ' · ' + c.usuarios + ' usuarios' : '') + (c.etapa_actualizada_por ? ' · cambiada por ' + c.etapa_actualizada_por : '') })]),
+        botonesEtapa(c.id, c.etapa)]);
     }));
   }
   var demoraBusqueda = null;
   $('buscarCuenta').addEventListener('input', function () { clearTimeout(demoraBusqueda); demoraBusqueda = setTimeout(cargarCuentas, 300); });
+
+  // Etapas manuales: SDR → Comercial → Implementación → Postventa y facturación. El responsable (o un líder) marca la etapa
+  // completa y la empresa pasa a la siguiente; su próximo mensaje va a la persona de esa etapa. Un líder puede corregirla.
+  function botonesEtapa(cuentaId, etapa) {
+    var i = ETAPAS.indexOf(etapa);
+    var caja = el('div', { clase: 'acciones etapa-acciones' });
+    if (i >= 0 && i < ETAPAS.length - 1) {
+      caja.appendChild(el('button', { type: 'button', clase: 'btn-sec', texto: 'Marcar etapa completa → ' + NOMBRE_ETAPA[ETAPAS[i + 1]],
+        onclick: function () { cambiarEtapa(this, { accion: 'avanzar_etapa', cuenta_id: cuentaId }, '¿Marcar ' + NOMBRE_ETAPA[etapa] + ' como completa y pasar a ' + NOMBRE_ETAPA[ETAPAS[i + 1]] + '? La empresa pasará a la persona de esa etapa.'); } }));
+    }
+    if (estado.ficha && estado.ficha.es_lider) {
+      var sel = el('select', { 'aria-label': 'Corregir etapa' }, ETAPAS.map(function (e) { var o = el('option', { value: e, texto: NOMBRE_ETAPA[e] }); if (e === etapa) o.selected = true; return o; }));
+      caja.appendChild(sel);
+      caja.appendChild(el('button', { type: 'button', clase: 'btn-sec', texto: 'Corregir etapa', onclick: function () {
+        if (sel.value === etapa) return;
+        cambiarEtapa(this, { accion: 'fijar_etapa', cuenta_id: cuentaId, etapa: sel.value }, '¿Cambiar la etapa a ' + NOMBRE_ETAPA[sel.value] + '?');
+      } }));
+    }
+    return caja;
+  }
+  async function cambiarEtapa(boton, cuerpo, pregunta) {
+    if (!window.confirm(pregunta)) return;
+    boton.disabled = true;
+    var d = await llamarChat(cuerpo);
+    boton.disabled = false;
+    if (d.error) { window.alert(d.error); return; }
+    cargarCuentas(); cargarConversaciones();
+    if (!$('vistaConv').hidden) pintarConversacion();
+  }
 
   async function abrirConversacion(id) {
     estado.convAbierta = id;
@@ -278,10 +309,12 @@
     // Datos internos de la cuenta (sanidad, ERP, responsables): solo por ficha_cuenta(), que verifica que el empleado pueda verla.
     var cuenta = (await sb.rpc('ficha_cuenta', { p_cuenta: c.cuenta_id })).data || {};
     var s = cuenta.senales || {};
+    cuenta.etapaVisible = NOMBRE_ETAPA[cuenta.etapa] || cuenta.etapa;
     $('convCabecera').replaceChildren(
       el('h1', { clase: 'titulo-conv', texto: (cuenta.nombre || 'Empresa') + ' — ' + (c.cliente_nombre || '') }),
-      el('div', { clase: 'meta', texto: [cuenta.etapa, cuenta.fase_detalle, cuenta.segmento, cuenta.usuarios != null ? cuenta.usuarios + ' usuarios' : '', s.sanidad ? 'Sanidad: ' + s.sanidad : '', s.erp ? 'ERP: ' + s.erp : ''].filter(Boolean).join(' · ') }),
-      c.regla ? el('div', { clase: 'meta', texto: 'Asignación: ' + c.regla }) : null
+      el('div', { clase: 'meta', texto: ['Etapa: ' + (cuenta.etapaVisible || '—'), cuenta.segmento, cuenta.usuarios != null ? cuenta.usuarios + ' usuarios' : '', s.sanidad ? 'Sanidad: ' + s.sanidad : '', s.erp ? 'ERP: ' + s.erp : ''].filter(Boolean).join(' · ') }),
+      c.regla ? el('div', { clase: 'meta', texto: 'Asignación: ' + c.regla }) : null,
+      botonesEtapa(c.cuenta_id, cuenta.etapa)
     );
     pintarMensajes($('convMensajes'), m, 'empleado');
     $('btnTomar').hidden = c.empleado_id === estado.uid || c.estado !== 'abierta';
@@ -322,14 +355,8 @@
   $('btnVolverConv').addEventListener('click', function () { estado.convAbierta = null; mostrar('vistaClientes'); cargarConversaciones(); });
 
   // ================= CLIENTE =================
+  // El cliente NO ve ningún dato de su empresa (decisión del 2-oct): solo su chat. La base tampoco se lo permite.
   async function abrirCliente() {
-    var cuenta = (await sb.from('crm_cuentas').select('nombre, etapa, fase_detalle').eq('id', estado.ficha.cuenta_id).maybeSingle()).data || {};
-    estado.cliente = cuenta;
-    $('cliEmpresa').textContent = cuenta.nombre || '';
-    var idx = ETAPAS.indexOf(cuenta.etapa);
-    $('cliEtapas').replaceChildren.apply($('cliEtapas'), ETAPAS.map(function (e, i) {
-      return el('div', { clase: 'etapa' + (i < idx ? ' hecha' : i === idx ? ' actual' : '') }, [el('span', { clase: 'pto' }), el('span', { texto: e }), i === idx && cuenta.fase_detalle ? el('small', { texto: cuenta.fase_detalle }) : null]);
-    }));
     $('cliSugerencias').replaceChildren.apply($('cliSugerencias'), SUGERENCIAS.map(function (s) {
       return el('button', { type: 'button', clase: 'filtro', texto: s, onclick: function () { $('txtCliente').value = s; $('txtCliente').focus(); } });
     }));
