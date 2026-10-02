@@ -6,32 +6,38 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://uvodcmmehtghkbwadzlq.supabase.co wss://uvodcmmehtghkbwadzlq.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'none'">
-<title>Comité de Cambios GeoVictoria</title>
+<title>Portal GeoVictoria</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="estilos.css">
 </head>
 <body>
 <header class="barra">
-  <div class="marca"><span class="logo" aria-hidden="true"></span><span>Comité de Cambios <b>GeoVictoria Colombia</b></span></div>
+  <div class="marca"><span class="logo" aria-hidden="true"></span><span>Portal <b>GeoVictoria Colombia</b></span></div>
   <div class="sesion" id="sesion" hidden>
+    <label class="disp" id="dispCaja" hidden><input type="checkbox" id="disponible" checked> Disponible</label>
     <span id="quien"></span>
     <button type="button" class="btn-sec" id="btnSalir">Salir</button>
   </div>
 </header>
 
+<nav class="pestanas" id="pestanas" hidden>
+  <button type="button" class="pestana" id="tabRfc" aria-pressed="true">Cambios (RFC)</button>
+  <button type="button" class="pestana" id="tabClientes" aria-pressed="false">Mis clientes <span class="badge" id="badgeClientes" hidden></span></button>
+</nav>
+
 <main>
-  <!-- Ingreso -->
+  <!-- Ingreso (empleados y clientes) -->
   <section class="vista" id="vistaLogin" hidden>
     <form class="tarjeta login" id="formLogin" autocomplete="on" novalidate>
       <h1>Ingresar</h1>
-      <p class="sub">Cambios que llegan de Chile y su cronograma en Colombia.</p>
-      <label for="correo">Correo corporativo</label>
+      <p class="sub">Clientes: habla con GeoVictoria. Empleados: cambios de Chile y tus clientes.</p>
+      <label for="correo">Correo</label>
       <input id="correo" type="email" autocomplete="username" required>
       <label for="clave">Contraseña</label>
       <div class="fila-clave"><input id="clave" type="password" autocomplete="current-password" required><button type="button" class="ojo" id="verClave" aria-label="Mostrar contraseña">Ver</button></div>
       <button type="submit" class="btn" id="btnEntrar">Entrar</button>
       <p class="aviso" id="avisoLogin" role="alert"></p>
-      <p class="nota">¿Olvidaste tu contraseña? Pídele a tu líder que la restablezca.</p>
+      <p class="nota">¿Olvidaste tu contraseña? Empleados: pídele a tu líder que la restablezca. Clientes: escríbele a tu contacto en GeoVictoria.</p>
     </form>
   </section>
 
@@ -51,7 +57,7 @@
     </form>
   </section>
 
-  <!-- Lista de RFC -->
+  <!-- EMPLEADO: lista de RFC -->
   <section class="vista" id="vistaLista" hidden>
     <div class="encabezado">
       <div>
@@ -64,14 +70,65 @@
     <div id="lista" class="lista" aria-live="polite"></div>
   </section>
 
-  <!-- Detalle -->
+  <!-- EMPLEADO: detalle de RFC -->
   <section class="vista" id="vistaDetalle" hidden>
     <button type="button" class="volver" id="btnVolver">← Todas las RFC</button>
     <article class="tarjeta detalle" id="detalle"></article>
   </section>
+
+  <!-- EMPLEADO: mis clientes -->
+  <section class="vista" id="vistaClientes" hidden>
+    <div class="encabezado">
+      <div>
+        <p class="ceja">Atención a clientes</p>
+        <h1>Conversaciones</h1>
+      </div>
+      <div class="filtros" role="group" aria-label="Filtrar conversaciones">
+        <button type="button" class="filtro" data-filtro="abiertas" aria-pressed="true">Abiertas</button>
+        <button type="button" class="filtro" data-filtro="cerradas" aria-pressed="false">Cerradas</button>
+      </div>
+    </div>
+    <div id="listaConv" class="lista" aria-live="polite"></div>
+    <h2 class="subtitulo">Mis cuentas en el CRM</h2>
+    <input type="search" id="buscarCuenta" placeholder="Buscar empresa" aria-label="Buscar empresa">
+    <div id="listaCuentas" class="lista cuentas"></div>
+  </section>
+
+  <!-- EMPLEADO: una conversación -->
+  <section class="vista" id="vistaConv" hidden>
+    <button type="button" class="volver" id="btnVolverConv">← Conversaciones</button>
+    <article class="tarjeta">
+      <div id="convCabecera"></div>
+      <div class="mensajes" id="convMensajes" aria-live="polite"></div>
+      <form class="responder" id="formResponder" novalidate>
+        <textarea id="txtResponder" rows="3" placeholder="Escribe tu respuesta al cliente" aria-label="Respuesta"></textarea>
+        <div class="acciones">
+          <button type="button" class="btn-sec" id="btnTomar" hidden>Tomar conversación</button>
+          <button type="button" class="btn-sec" id="btnCerrar">Cerrar conversación</button>
+          <button type="submit" class="btn" id="btnResponder">Enviar</button>
+        </div>
+        <p class="aviso" id="avisoResponder" role="alert"></p>
+      </form>
+    </article>
+  </section>
+
+  <!-- CLIENTE: su chat -->
+  <section class="vista" id="vistaCliente" hidden>
+    <div class="tarjeta">
+      <p class="ceja" id="cliEmpresa"></p>
+      <div class="etapas" id="cliEtapas" aria-label="Etapa de tu proceso"></div>
+      <div class="mensajes chat" id="cliMensajes" aria-live="polite"></div>
+      <div class="sugerencias" id="cliSugerencias"></div>
+      <form class="responder" id="formCliente" novalidate>
+        <textarea id="txtCliente" rows="2" placeholder="Escribe tu pregunta" aria-label="Mensaje"></textarea>
+        <div class="acciones"><button type="submit" class="btn" id="btnCliente">Enviar</button></div>
+        <p class="aviso" id="avisoCliente" role="alert"></p>
+      </form>
+    </div>
+  </section>
 </main>
 
-<footer class="pie">Solo lectura. Las RFC las publican la Country y los líderes desde el Comité de Cambios.</footer>
+<footer class="pie" id="pie">Portal GeoVictoria Colombia.</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
 <script src="app.js"></script>
