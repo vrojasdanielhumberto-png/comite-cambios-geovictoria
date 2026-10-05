@@ -1,4 +1,5 @@
 // Portal GeoVictoria — web para empleados (RFC + atención de sus clientes) y para clientes (chat).
+// El chat de clientes tiene un interruptor (herramientas/chat-interruptor.mjs); hoy está EN PAUSA (decisión de GeoVictoria, 5-oct).
 // Seguridad: la llave "publishable" de Supabase es pública por diseño; lo que protege los datos son
 // las reglas de acceso por fila en la base. Desde aquí nadie escribe directo en la base: los mensajes
 // pasan por la función "chat" del servidor, que valida quién es cada persona.
@@ -22,6 +23,17 @@
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic'];
   function nuevoEstado() { return { rol: null, ficha: null, rfcs: [], area: '', texto: '', convs: [], filtroConv: 'abiertas', convAbierta: null, cuentas: [], cliente: null }; }
   var estado = nuevoEstado();
+  // Interruptor del chat de clientes (tabla ajustes, migración 007). En pausa: solo RFC para empleados; clientes no entran.
+  var chatActivo = false;
+  async function leerInterruptor() {
+    var r = await sb.from('ajustes').select('valor').eq('clave', 'chat_clientes').maybeSingle();
+    chatActivo = !!(r.data && r.data.valor && r.data.valor.activo === true);
+    var sub = document.querySelector('#formLogin .sub'), nota = document.querySelector('#formLogin .nota');
+    if (!chatActivo) {
+      if (sub) sub.textContent = 'Empleados de GeoVictoria Colombia: los cambios que llegan de Chile.';
+      if (nota) nota.textContent = '¿Olvidaste tu contraseña? Pídele a tu líder que la restablezca.';
+    }
+  }
 
   function el(tag, attrs, hijos) {
     var n = document.createElement(tag);
@@ -40,7 +52,7 @@
   function mostrar(v) {
     VISTAS.forEach(function (x) { $(x).hidden = x !== v; });
     var emp = estado.rol === 'empleado' && ['vistaLista', 'vistaDetalle', 'vistaClientes', 'vistaConv'].indexOf(v) >= 0;
-    $('pestanas').hidden = !emp;
+    $('pestanas').hidden = !emp || !chatActivo;
     $('tabRfc').setAttribute('aria-pressed', String(v === 'vistaLista' || v === 'vistaDetalle'));
     $('tabClientes').setAttribute('aria-pressed', String(v === 'vistaClientes' || v === 'vistaConv'));
     window.scrollTo(0, 0);
@@ -80,19 +92,21 @@
     var rol = 'empleado';
     if (!f.data) { f = await sb.from('clientes').select('nombre, correo, activo, debe_cambiar_clave, cuenta_id').maybeSingle(); rol = 'cliente'; }
     if (f.error || !f.data || !f.data.activo) { salir('Tu cuenta no tiene acceso. Habla con tu contacto en GeoVictoria.'); return; }
+    await leerInterruptor();
+    if (rol === 'cliente' && !chatActivo) { salir('La atención a clientes por este portal está en pausa por ahora. Escríbele a tu contacto en GeoVictoria.'); return; }
     estado.ficha = f.data; estado.rol = rol; estado.uid = s.user.id;
     $('quien').textContent = f.data.nombre || f.data.correo;
     $('sesion').hidden = false;
     reiniciarInactividad();
     if (f.data.debe_cambiar_clave) { $('formCambio').reset(); $('avisoCambio').textContent = ''; mostrar('vistaCambio'); return; }
-    iniciarTiempoReal();
+    if (chatActivo) iniciarTiempoReal();
     if (rol === 'cliente') { $('pie').textContent = 'Te responde el asistente de GeoVictoria y, si hace falta, la persona que lleva tu cuenta.'; await abrirCliente(); return; }
     $('pie').textContent = 'Las RFC las publican la Country y los líderes desde el Comité de Cambios.';
-    $('dispCaja').hidden = false;
+    $('dispCaja').hidden = !chatActivo;
     $('disponible').checked = f.data.disponible !== false;
     await cargarRfcs();
     mostrar('vistaLista');
-    cargarConversaciones();
+    if (chatActivo) cargarConversaciones();
   }
 
   // ---------- ingreso ----------
@@ -392,7 +406,7 @@
   function refrescar() {
     if (!estado.ficha || estado.ficha.debe_cambiar_clave) return;
     if (estado.rol === 'cliente' && !$('vistaCliente').hidden) pintarChatCliente();
-    if (estado.rol === 'empleado') {
+    if (estado.rol === 'empleado' && chatActivo) {
       if (!$('vistaConv').hidden) pintarConversacion();
       cargarConversaciones();
     }
@@ -411,5 +425,5 @@
   setInterval(function () { if (estado.rol === 'empleado' && document.visibilityState === 'visible' && !$('vistaLista').hidden) cargarRfcs(); }, 60000);
 
   sb.auth.onAuthStateChange(function (ev) { if (ev === 'SIGNED_OUT' && estado.ficha) salir(''); });
-  arrancar();
+  leerInterruptor().catch(function () {}).finally(arrancar);
 })();
